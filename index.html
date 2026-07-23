@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Quiz en vivo — Fundamentos de VoIP</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --bg-0:#0B0F1A;
+    --bg-1:#121A2E;
+    --panel:#171F36;
+    --line:#26314F;
+    --ink:#EEF1FA;
+    --ink-dim:#9AA6C4;
+    --signal:#3DF2C0;   /* señal / "en vivo" */
+    --a-red:#FF4D6D;
+    --a-blue:#3E8BFF;
+    --a-yellow:#FFC93D;
+    --a-green:#37D67A;
+    --gold:#FFD25A;
+    --silver:#C9D3E8;
+    --bronze:#E3A56A;
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, #1B2A4E 0%, transparent 60%),
+      radial-gradient(ellipse 900px 500px at 100% 110%, #241539 0%, transparent 60%),
+      var(--bg-0);
+    color:var(--ink);
+    min-height:100%;
+    display:flex;
+    flex-direction:column;
+  }
+  .wrap{ flex:1; display:flex; flex-direction:column; padding:22px; max-width:980px; margin:0 auto; width:100%; }
+  .brand{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .brand .dot{ width:9px; height:9px; border-radius:50%; background:var(--signal); box-shadow:0 0 10px var(--signal); }
+  .brand span{ font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-dim); font-weight:600; }
+  h1{ font-size:26px; margin:2px 0 4px; letter-spacing:-.01em; }
+  .sub{ color:var(--ink-dim); font-size:14px; margin-bottom:18px; }
+
+  .card{
+    background:linear-gradient(180deg, var(--panel), #131A2E);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:26px;
+    box-shadow:0 20px 50px -20px rgba(0,0,0,.6);
+  }
+
+  /* ---- botones ---- */
+  .btn{
+    appearance:none; border:none; cursor:pointer; border-radius:12px;
+    font-weight:700; font-size:15px; padding:14px 22px;
+    color:#0B0F1A; background:var(--signal);
+    transition:transform .12s ease, filter .12s ease;
+  }
+  .btn:hover{ filter:brightness(1.08); transform:translateY(-1px); }
+  .btn:active{ transform:translateY(0); }
+  .btn.ghost{ background:transparent; color:var(--ink); border:1px solid var(--line); }
+  .btn.ghost:hover{ border-color:var(--signal); }
+  .btn.wide{ width:100%; }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; transform:none; filter:none; }
+
+  input[type=text]{
+    width:100%; padding:14px 16px; border-radius:12px; border:1px solid var(--line);
+    background:#0E1526; color:var(--ink); font-size:16px; outline:none;
+  }
+  input[type=text]:focus{ border-color:var(--signal); }
+
+  /* ---- pantalla de selección de rol ---- */
+  .role-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:18px; }
+  @media (max-width:640px){ .role-grid{ grid-template-columns:1fr; } }
+  .role-card{
+    background:var(--bg-1); border:1px solid var(--line); border-radius:16px; padding:22px;
+    cursor:pointer; text-align:left; transition:border-color .15s, transform .15s;
+  }
+  .role-card:hover{ border-color:var(--signal); transform:translateY(-2px); }
+  .role-card .emoji{ font-size:28px; }
+  .role-card h3{ margin:10px 0 6px; font-size:17px; }
+  .role-card p{ margin:0; color:var(--ink-dim); font-size:13px; line-height:1.5; }
+
+  /* ---- lobby host ---- */
+  .lobby-top{ display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+  .qr-box{ background:#fff; border-radius:14px; padding:14px; display:inline-block; }
+  .join-hint{ margin-top:10px; color:var(--ink-dim); font-size:13px; text-align:center; }
+  .players-panel{ flex:1; min-width:220px; }
+  .players-panel h3{ font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-dim); margin-bottom:10px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; min-height:44px; }
+  .chip{
+    background:#1B2440; border:1px solid var(--line); padding:8px 14px; border-radius:999px;
+    font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px;
+  }
+  .chip .avatar{ width:18px; height:18px; border-radius:50%; }
+  .empty-note{ color:var(--ink-dim); font-size:13px; font-style:italic; }
+
+  /* ---- pregunta ---- */
+  .q-meta{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .q-count{ color:var(--ink-dim); font-size:13px; font-weight:600; }
+  .timer{
+    width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:18px; background:#0E1526; border:3px solid var(--signal); flex-shrink:0;
+  }
+  .timer.low{ border-color:var(--a-red); color:var(--a-red); }
+  .q-topic{ display:inline-block; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--signal); background:rgba(61,242,192,.1); border:1px solid rgba(61,242,192,.3); padding:4px 10px; border-radius:999px; margin-bottom:12px; }
+  .q-text{ font-size:22px; font-weight:700; line-height:1.35; margin-bottom:20px; }
+
+  .opts{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:560px){ .opts{ grid-template-columns:1fr; } }
+  .opt{
+    border:none; border-radius:14px; padding:18px 16px; text-align:left; cursor:pointer;
+    color:#0B0F1A; font-size:15px; font-weight:700; display:flex; align-items:center; gap:12px;
+    transition:transform .12s ease, filter .12s ease, opacity .2s;
+    min-height:64px;
+  }
+  .opt .shape{ width:22px; height:22px; flex-shrink:0; }
+  .opt:hover:not(:disabled){ transform:translateY(-2px) scale(1.01); filter:brightness(1.06); }
+  .opt:disabled{ cursor:default; }
+  .opt.o0{ background:var(--a-red); }
+  .opt.o1{ background:var(--a-blue); color:#fff; }
+  .opt.o2{ background:var(--a-yellow); }
+  .opt.o3{ background:var(--a-green); }
+  .opt.dim{ opacity:.35; filter:grayscale(.4); }
+  .opt.correct{ outline:4px solid #fff; box-shadow:0 0 0 4px var(--signal); }
+  .opt.wrong{ opacity:.5; }
+
+  .waiting{ text-align:center; padding:40px 10px; }
+  .waiting .pulse{ width:14px; height:14px; border-radius:50%; background:var(--signal); margin:0 auto 16px; animation:pulse 1.2s infinite; }
+  @keyframes pulse{ 0%,100%{ transform:scale(1); opacity:1;} 50%{ transform:scale(1.6); opacity:.4;} }
+
+  /* ---- resultados / leaderboard ---- */
+  .reveal-answer{ display:flex; align-items:center; gap:12px; padding:16px; border-radius:12px; background:rgba(61,242,192,.08); border:1px solid rgba(61,242,192,.35); margin-bottom:18px; }
+  .reveal-answer .tag{ background:var(--signal); color:#0B0F1A; font-weight:800; font-size:11px; padding:4px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:.06em; }
+  .bar-row{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .bar-label{ width:26px; height:26px; border-radius:7px; flex-shrink:0; }
+  .bar-track{ flex:1; height:26px; background:#0E1526; border-radius:8px; overflow:hidden; border:1px solid var(--line); }
+  .bar-fill{ height:100%; border-radius:8px; transition:width .5s ease; }
+  .bar-count{ width:34px; text-align:right; font-size:13px; color:var(--ink-dim); font-weight:700; }
+
+  .lb-row{ display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:12px; background:var(--bg-1); border:1px solid var(--line); margin-bottom:8px; }
+  .lb-rank{ width:30px; text-align:center; font-weight:800; font-size:16px; color:var(--ink-dim); }
+  .lb-row.r1 .lb-rank{ color:var(--gold); } .lb-row.r1{ border-color:rgba(255,210,90,.4); }
+  .lb-row.r2 .lb-rank{ color:var(--silver); }
+  .lb-row.r3 .lb-rank{ color:var(--bronze); }
+  .lb-name{ flex:1; font-weight:700; }
+  .lb-score{ font-weight:800; color:var(--signal); }
+  .lb-delta{ font-size:12px; color:var(--ink-dim); }
+
+  .feedback-big{ text-align:center; padding:30px 10px; }
+  .feedback-big .icon{ font-size:52px; margin-bottom:10px; }
+  .feedback-big .pts{ font-size:15px; color:var(--ink-dim); margin-top:6px; }
+
+  .footer-row{ display:flex; justify-content:space-between; align-items:center; margin-top:20px; gap:10px; flex-wrap:wrap; }
+  .podium{ display:flex; align-items:flex-end; gap:14px; justify-content:center; margin:26px 0 10px; }
+  .podium .col{ text-align:center; }
+  .podium .bar{ width:88px; border-radius:10px 10px 0 0; display:flex; align-items:flex-start; justify-content:center; padding-top:10px; font-weight:800; }
+  .podium .p1 .bar{ height:130px; background:linear-gradient(180deg,#FFE79A,var(--gold)); color:#3a2a00; }
+  .podium .p2 .bar{ height:96px; background:linear-gradient(180deg,#E7ECF7,var(--silver)); color:#2a2f3d; }
+  .podium .p3 .bar{ height:72px; background:linear-gradient(180deg,#F4C79A,var(--bronze)); color:#3a2200; }
+  .podium .name{ margin-top:8px; font-weight:700; font-size:13px; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .podium .score{ font-size:12px; color:var(--ink-dim); }
+
+  .hidden{ display:none !important; }
+  .small-note{ font-size:12px; color:var(--ink-dim); margin-top:14px; line-height:1.5; }
+  .pin-badge{ font-family:monospace; font-size:13px; background:#0E1526; border:1px solid var(--line); padding:6px 12px; border-radius:8px; color:var(--signal); letter-spacing:.08em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><div class="dot"></div><span>Sesión en vivo</span></div>
+  <h1 id="pageTitle">Quiz — Fundamentos de VoIP</h1>
+  <div class="sub" id="pageSub">20 preguntas · Investigación técnica de VoIP</div>
+
+  <div class="card" id="app"><!-- las vistas se inyectan aquí --></div>
+
+  <div class="small-note" id="footNote"></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+// ============================================================
+// PREGUNTAS
+// ============================================================
+const QUESTIONS = [
+ {tema:"VoIP vs. Telefonía Tradicional", q:"¿Cuál es la diferencia fundamental entre VoIP y la telefonía tradicional (PSTN)?",
+  opts:["VoIP transmite voz mediante paquetes de datos sobre redes IP; la PSTN usa conmutación de circuitos","VoIP requiere líneas telefónicas de cobre dedicadas","La PSTN utiliza direcciones IP para establecer llamadas","No existe ninguna diferencia técnica relevante"], correct:0},
+ {tema:"Conversión Analógica-Digital", q:"¿Cuál es el orden correcto del proceso de conversión de voz analógica a digital?",
+  opts:["Codificación → Cuantización → Muestreo","Muestreo → Cuantización → Codificación","Cuantización → Codificación → Muestreo","Codificación → Muestreo → Cuantización"], correct:1},
+ {tema:"Conversión Analógica-Digital", q:"Durante la cuantización, ¿qué se hace con cada muestra tomada de la señal analógica?",
+  opts:["Se transmite directamente sin modificarla","Se le asigna un valor numérico discreto dentro de un rango de niveles","Se elimina si supera cierto umbral","Se convierte directamente en un paquete RTP"], correct:1},
+ {tema:"Protocolo SIP", q:"¿Qué es el protocolo SIP (Session Initiation Protocol)?",
+  opts:["Un protocolo de transporte de audio en tiempo real","Un protocolo de señalización para iniciar, modificar y terminar sesiones de comunicación","Un códec de compresión de voz","Un mecanismo de cifrado de llamadas"], correct:1},
+ {tema:"Protocolo SIP", q:"¿Qué mensaje SIP se utiliza para iniciar una nueva llamada?",
+  opts:["BYE","ACK","INVITE","TRYING"], correct:2},
+ {tema:"Protocolo SIP", q:"¿Qué mensaje SIP se utiliza para finalizar una sesión ya establecida?",
+  opts:["BYE","INVITE","RINGING","OK"], correct:0},
+ {tema:"Protocolo H.323", q:"¿Cuál es una diferencia clave entre H.323 y SIP?",
+  opts:["H.323 es binario y más complejo; SIP es de texto (tipo HTTP), más simple y flexible","SIP solo funciona en redes telefónicas tradicionales","H.323 no puede establecer videollamadas","No existe ninguna diferencia entre ambos"], correct:0},
+ {tema:"Protocolo H.323", q:"H.323 es un estándar desarrollado principalmente por:",
+  opts:["IETF","UIT-T (ITU-T)","IEEE","W3C"], correct:1},
+ {tema:"RTP y RTCP", q:"¿Cuál es la función del protocolo RTP?",
+  opts:["Transportar audio y video en tiempo real durante la llamada","Establecer y terminar la sesión de la llamada","Asignar direcciones IP a los dispositivos","Cifrar la señalización de la llamada"], correct:0},
+ {tema:"RTP y RTCP", q:"¿Qué función cumple RTCP dentro de una sesión RTP?",
+  opts:["Reemplaza a RTP en la transmisión de audio","Envía reportes sobre la calidad de la transmisión (pérdida de paquetes, jitter, etc.)","Enruta los paquetes IP","Cifra los paquetes de voz"], correct:1},
+ {tema:"Códecs de Voz", q:"¿Cuál es la tasa de bits aproximada del códec G.711?",
+  opts:["8 kbps","64 kbps","16 kbps","128 kbps"], correct:1},
+ {tema:"Códecs de Voz", q:"¿Cuál de estos códecs está diseñado para consumir muy poco ancho de banda (~8 kbps)?",
+  opts:["G.711","G.722","G.729","Opus a máxima calidad"], correct:2},
+ {tema:"Códecs de Voz", q:"¿Qué distingue al códec G.722 frente a G.711?",
+  opts:["G.722 es de banda ancha (wideband) y ofrece mayor calidad de audio","G.722 usa menos ancho de banda que G.729","G.722 no puede usarse en redes VoIP","G.722 no comprime la señal de voz"], correct:0},
+ {tema:"Códecs de Voz", q:"¿Qué ventaja tiene el códec Opus frente a códecs más antiguos como G.711 o G.729?",
+  opts:["Es de tasa de bits fija, no ajustable","Ofrece tasa de bits variable y adaptable, ideal para distintas condiciones de red","Solo funciona en telefonía tradicional","Requiere siempre más de 500 kbps"], correct:1},
+ {tema:"Jitter", q:"¿Qué es el jitter en una red VoIP?",
+  opts:["La variación en el tiempo de llegada de los paquetes de voz","La pérdida total de la conexión a internet","El volumen de la señal de audio","El número de usuarios conectados a la red"], correct:0},
+ {tema:"Jitter", q:"¿Qué mecanismo se usa comúnmente para corregir el jitter?",
+  opts:["Un firewall","Un búfer de jitter (jitter buffer) que retiene brevemente los paquetes antes de reproducirlos","Aumentar la resolución de video","Desactivar el códec de voz"], correct:1},
+ {tema:"Latencia", q:"Según la recomendación ITU-T G.114, ¿cuál es el máximo de latencia de un solo sentido recomendado para buena calidad?",
+  opts:["500 ms","1000 ms","150 ms","50 ms"], correct:2},
+ {tema:"Latencia", q:"¿Qué efecto produce una latencia alta en una llamada VoIP?",
+  opts:["Mejora la calidad del audio","Provoca retrasos perceptibles y solapamiento en la conversación","No tiene ningún efecto perceptible","Aumenta automáticamente el ancho de banda disponible"], correct:1},
+ {tema:"Calidad de Servicio (QoS)", q:"¿Qué es la Calidad de Servicio (QoS) en el contexto de VoIP?",
+  opts:["Un códec de compresión de voz","Mecanismos que priorizan y gestionan el tráfico de red para garantizar buen desempeño","Un protocolo exclusivo de telefonía tradicional","Un tipo de cable de red"], correct:1},
+ {tema:"Calidad de Servicio (QoS)", q:"¿Cuál de los siguientes es un mecanismo para priorizar el tráfico de voz sobre otros datos?",
+  opts:["DiffServ (Differentiated Services) mediante colas de prioridad","Desactivar el cifrado de la red","Aumentar el tamaño de los paquetes de datos","Eliminar los códecs de voz"], correct:0},
+];
+const TIME_LIMIT = 20; // segundos por pregunta
+const OPT_CLASS = ["o0","o1","o2","o3"];
+const OPT_SHAPE = ["▲","◆","●","■"];
+
+// ============================================================
+// STORAGE HELPERS
+// ============================================================
+const GAME_KEY = "vquiz:currentGame";
+function gKey(id, suffix){ return "vquiz:g:" + id + ":" + suffix; }
+
+async function sGet(key, shared){
+  try{ const r = await window.storage.get(key, !!shared); return r ? r.value : null; }
+  catch(e){ return null; }
+}
+async function sSet(key, value, shared){
+  try{ await window.storage.set(key, value, !!shared); return true; }
+  catch(e){ return false; }
+}
+async function sList(prefix, shared){
+  try{ const r = await window.storage.list(prefix, !!shared); return r ? r.keys : []; }
+  catch(e){ return []; }
+}
+
+function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+function shortPin(){ return String(Math.floor(1000 + Math.random()*9000)); }
+
+// ============================================================
+// ESTADO LOCAL
+// ============================================================
+let role = null;          // 'host' | 'player'
+let gameId = null;
+let playerId = null;
+let playerName = null;
+let pollTimer = null;
+let localAnswered = false;
+let questionDeadlineTs = null;
+
+const app = document.getElementById("app");
+const footNote = document.getElementById("footNote");
+
+// ============================================================
+// VISTA: SELECCIÓN DE ROL
+// ============================================================
+async function renderRoleSelect(){
+  stopPolling();
+  footNote.textContent = "";
+  // ¿ya hay un juego activo? si sí, y aún está en lobby, ofrecer unirse directo
+  const active = await sGet(GAME_KEY, true);
+
+  app.innerHTML = `
+    <div class="role-grid">
+      <div class="role-card" id="cardHost">
+        <div class="emoji">🖥️</div>
+        <h3>Soy el anfitrión</h3>
+        <p>Proyecta esta pantalla. Se generará un código QR para que el grupo se una desde su celular.</p>
+      </div>
+      <div class="role-card" id="cardPlayer">
+        <div class="emoji">📱</div>
+        <h3>Soy jugador</h3>
+        <p>Ingresa tu nombre y espera a que el anfitrión inicie el quiz.</p>
+      </div>
+    </div>
+    <div class="small-note">Todos deben tener esta misma página abierta (el anfitrión la proyecta, cada jugador la abre en su propio celular escaneando el QR).</div>
+  `;
+  document.getElementById("cardHost").onclick = startAsHost;
+  document.getElementById("cardPlayer").onclick = () => renderJoinScreen(active);
+}
+
+async function startAsHost(){
+  gameId = shortPin();
+  role = "host";
+  const meta = { status:"lobby", currentQuestion:-1, questionStartTime:null, revealedAt:null, createdAt: Date.now() };
+  await sSet(gKey(gameId,"meta"), JSON.stringify(meta), true);
+  await sSet(GAME_KEY, gameId, true);
+  renderHostLobby();
+}
+
+function renderJoinScreen(activeGameId){
+  role = "player";
+  app.innerHTML = `
+    <h3 style="margin-top:0;">Unirse al quiz</h3>
+    <div class="sub" style="margin-bottom:16px;">Escribe tu nombre para entrar a la sala.</div>
+    <input type="text" id="nameInput" maxlength="20" placeholder="Tu nombre..." />
+    <div style="height:12px;"></div>
+    <button class="btn wide" id="joinBtn">Entrar</button>
+    <div class="small-note" id="joinStatus">${activeGameId ? "" : "Aún no hay una sala activa. Pídele al anfitrión que la cree."}</div>
+  `;
+  document.getElementById("joinBtn").onclick = async () => {
+    const val = document.getElementById("nameInput").value.trim();
+    if(!val){ return; }
+    const active = await sGet(GAME_KEY, true);
+    if(!active){
+      document.getElementById("joinStatus").textContent = "Aún no hay una sala activa. Espera a que el anfitrión la cree y vuelve a intentar.";
+      return;
+    }
+    gameId = active;
+    playerId = uid();
+    playerName = val.slice(0,20);
+    await sSet(gKey(gameId, "player:" + playerId), JSON.stringify({name: playerName, score:0, joinedAt: Date.now()}), true);
+    renderPlayerScreen();
+  };
+}
+
+// ============================================================
+// HOST: LOBBY
+// ============================================================
+async function renderHostLobby(){
+  const joinUrl = window.location.href;
+  app.innerHTML = `
+    <div class="lobby-top">
+      <div>
+        <div class="qr-box" id="qrBox"></div>
+        <div class="join-hint">Escanea para unirte<br><span class="pin-badge">PIN ${gameId}</span></div>
+      </div>
+      <div class="players-panel">
+        <h3 id="playerCountLabel">Jugadores en la sala (0)</h3>
+        <div class="chips" id="chipsWrap"><div class="empty-note">Esperando jugadores…</div></div>
+        <div style="height:18px;"></div>
+        <button class="btn wide" id="startBtn" disabled>Esperando al menos 1 jugador…</button>
+      </div>
+    </div>
+  `;
+  new QRCode(document.getElementById("qrBox"), { text: joinUrl, width:150, height:150, colorDark:"#0B0F1A", colorLight:"#ffffff" });
+  document.getElementById("startBtn").onclick = beginQuestions;
+  footNote.textContent = "Anfitrión · sala " + gameId;
+  pollTimer = setInterval(pollLobby, 1500);
+  pollLobby();
+}
+
+async function pollLobby(){
+  const keys = await sList(gKey(gameId,"player:"), true);
+  const wrap = document.getElementById("chipsWrap");
+  const label = document.getElementById("playerCountLabel");
+  const startBtn = document.getElementById("startBtn");
+  if(!wrap || !label || !startBtn) return;
+  if(keys.length === 0){
+    wrap.innerHTML = '<div class="empty-note">Esperando jugadores…</div>';
+    label.textContent = "Jugadores en la sala (0)";
+    startBtn.disabled = true;
+    startBtn.textContent = "Esperando al menos 1 jugador…";
+    return;
+  }
+  const players = [];
+  for(const k of keys){
+    const raw = await sGet(k, true);
+    if(raw){ try{ players.push(JSON.parse(raw)); }catch(e){} }
+  }
+  label.textContent = "Jugadores en la sala (" + players.length + ")";
+  wrap.innerHTML = players.map(p => `<div class="chip"><span class="avatar" style="background:${colorFor(p.name)}"></span>${escapeHtml(p.name)}</div>`).join("");
+  startBtn.disabled = false;
+  startBtn.textContent = "▶ Iniciar quiz (" + players.length + " jugador" + (players.length===1?"":"es") + ")";
+}
+
+function colorFor(name){
+  const colors = ["#FF4D6D","#3E8BFF","#FFC93D","#37D67A","#B084FF","#FF9F45"];
+  let h = 0; for(let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) % colors.length;
+  return colors[Math.abs(h)];
+}
+function escapeHtml(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+
+// ============================================================
+// HOST: FLUJO DE PREGUNTAS
+// ============================================================
+async function beginQuestions(){
+  stopPolling();
+  await goToQuestion(0);
+}
+
+async function goToQuestion(idx){
+  if(idx >= QUESTIONS.length){ return hostShowFinal(); }
+  const meta = { status:"question", currentQuestion: idx, questionStartTime: Date.now(), revealedAt:null };
+  await sSet(gKey(gameId,"meta"), JSON.stringify(meta), true);
+  renderHostQuestion(idx);
+}
+
+function renderHostQuestion(idx){
+  const item = QUESTIONS[idx];
+  app.innerHTML = `
+    <div class="q-meta">
+      <div class="q-count">Pregunta ${idx+1} / ${QUESTIONS.length}</div>
+      <div class="timer" id="hostTimer">${TIME_LIMIT}</div>
+    </div>
+    <div class="q-topic">${item.tema}</div>
+    <div class="q-text">${item.q}</div>
+    <div class="opts">
+      ${item.opts.map((o,i)=>`<div class="opt ${OPT_CLASS[i]}"><span class="shape">${OPT_SHAPE[i]}</span>${o}</div>`).join("")}
+    </div>
+    <div class="footer-row">
+      <div class="small-note" id="answeredCount">0 jugadores han respondido</div>
+      <button class="btn ghost" id="revealNowBtn">Mostrar resultados ahora →</button>
+    </div>
+  `;
+  document.getElementById("revealNowBtn").onclick = () => hostReveal(idx);
+  questionDeadlineTs = Date.now() + TIME_LIMIT*1000;
+  footNote.textContent = "Anfitrión · sala " + gameId + " · pregunta " + (idx+1);
+  pollTimer = setInterval(() => hostTickQuestion(idx), 700);
+  hostTickQuestion(idx);
+}
+
+async function hostTickQuestion(idx){
+  const timerEl = document.getElementById("hostTimer");
+  if(!timerEl) return;
+  const remaining = Math.max(0, Math.ceil((questionDeadlineTs - Date.now())/1000));
+  timerEl.textContent = remaining;
+  timerEl.classList.toggle("low", remaining <= 5);
+  const keys = await sList(gKey(gameId,"answer:"+idx+":"), true);
+  const cEl = document.getElementById("answeredCount");
+  if(cEl) cEl.textContent = keys.length + " jugador" + (keys.length===1?"":"es") + " han respondido";
+  if(remaining <= 0){ hostReveal(idx); }
+}
+
+async function hostReveal(idx){
+  stopPolling();
+  const item = QUESTIONS[idx];
+  // reunir respuestas
+  const ansKeys = await sList(gKey(gameId,"answer:"+idx+":"), true);
+  const answers = [];
+  for(const k of ansKeys){
+    const raw = await sGet(k, true);
+    if(raw){ try{ answers.push(JSON.parse(raw)); }catch(e){} }
+  }
+  // reunir jugadores actuales
+  const plKeys = await sList(gKey(gameId,"player:"), true);
+  const players = [];
+  for(const k of plKeys){
+    const raw = await sGet(k, true);
+    if(raw){ try{ players.push({key:k, data: JSON.parse(raw)}); }catch(e){} }
+  }
+  // calcular puntajes de esta ronda y actualizar
+  const startTs = questionDeadlineTs - TIME_LIMIT*1000;
+  // emparejar respuestas por playerId embebido en la clave
+  for(const k of ansKeys){
+    const raw = await sGet(k, true);
+    if(!raw) continue;
+    let a; try{ a = JSON.parse(raw); }catch(e){ continue; }
+    const pid = k.split(":").pop();
+    const match = players.find(p => p.key.endsWith(":"+pid));
+    if(!match) continue;
+    const correct = a.optionIndex === item.correct;
+    let pts = 0;
+    if(correct){
+      const elapsed = Math.min(TIME_LIMIT*1000, Math.max(0, a.answeredAt - startTs));
+      pts = Math.round(500 + 500 * (1 - elapsed/(TIME_LIMIT*1000)));
+    }
+    match.data.score = (match.data.score||0) + pts;
+    match.data.lastDelta = pts;
+    await sSet(match.key, JSON.stringify(match.data), true);
+  }
+  // los que no respondieron: delta 0 (y se persiste, para no arrastrar un delta viejo)
+  for(const p of players){
+    const answered = ansKeys.some(k => k.endsWith(":" + p.key.split(":").pop()));
+    if(!answered && p.data.lastDelta !== 0){
+      p.data.lastDelta = 0;
+      await sSet(p.key, JSON.stringify(p.data), true);
+    }
+  }
+
+  // distribución de respuestas
+  const dist = [0,0,0,0];
+  answers.forEach(a => { if(a.optionIndex>=0 && a.optionIndex<4) dist[a.optionIndex]++; });
+  const maxCount = Math.max(1, ...dist);
+
+  await sSet(gKey(gameId,"meta"), JSON.stringify({status:"reveal", currentQuestion:idx, questionStartTime:null, revealedAt:Date.now()}), true);
+
+  app.innerHTML = `
+    <div class="q-topic">${item.tema}</div>
+    <div class="q-text" style="font-size:19px;">${item.q}</div>
+    <div class="reveal-answer"><span class="tag">Correcta</span> ${item.opts[item.correct]}</div>
+    ${dist.map((c,i)=>`
+      <div class="bar-row">
+        <div class="bar-label ${OPT_CLASS[i]}" style="background:var(--a-${["red","blue","yellow","green"][i]})"></div>
+        <div class="bar-track"><div class="bar-fill ${i===item.correct?'':''}" style="width:${(c/maxCount*100)}%; background:${i===item.correct?'var(--signal)':'#3A4568'}"></div></div>
+        <div class="bar-count">${c}</div>
+      </div>`).join("")}
+    <div class="footer-row">
+      <div class="small-note">${answers.length} respuesta(s) recibidas</div>
+      <button class="btn" id="nextBtn">${idx+1 < QUESTIONS.length ? "Ver marcador →" : "Ver resultado final →"}</button>
+    </div>
+  `;
+  document.getElementById("nextBtn").onclick = () => hostShowLeaderboard(idx);
+}
+
+async function hostShowLeaderboard(idx){
+  const plKeys = await sList(gKey(gameId,"player:"), true);
+  const players = [];
+  for(const k of plKeys){
+    const raw = await sGet(k, true);
+    if(raw){ try{ players.push(JSON.parse(raw)); }catch(e){} }
+  }
+  players.sort((a,b)=> (b.score||0) - (a.score||0));
+  await sSet(gKey(gameId,"meta"), JSON.stringify({status:"leaderboard", currentQuestion:idx, questionStartTime:null}), true);
+
+  app.innerHTML = `
+    <h3 style="margin-top:0;">Marcador</h3>
+    <div>${players.slice(0,8).map((p,i)=>`
+      <div class="lb-row r${i+1}">
+        <div class="lb-rank">${i+1}</div>
+        <div class="lb-name">${escapeHtml(p.name)}</div>
+        <div class="lb-delta">${p.lastDelta ? "+"+p.lastDelta : "+0"}</div>
+        <div class="lb-score">${p.score||0}</div>
+      </div>`).join("")}
+    </div>
+    <div class="footer-row">
+      <div class="small-note">Pregunta ${idx+1} de ${QUESTIONS.length} completada</div>
+      <button class="btn" id="nextQBtn">${idx+1 < QUESTIONS.length ? "Siguiente pregunta →" : "Ver podio final →"}</button>
+    </div>
+  `;
+  document.getElementById("nextQBtn").onclick = () => {
+    if(idx+1 < QUESTIONS.length) goToQuestion(idx+1);
+    else hostShowFinal();
+  };
+}
+
+async function hostShowFinal(){
+  const plKeys = await sList(gKey(gameId,"player:"), true);
+  const players = [];
+  for(const k of plKeys){
+    const raw = await sGet(k, true);
+    if(raw){ try{ players.push(JSON.parse(raw)); }catch(e){} }
+  }
+  players.sort((a,b)=> (b.score||0) - (a.score||0));
+  await sSet(gKey(gameId,"meta"), JSON.stringify({status:"ended", currentQuestion:QUESTIONS.length}), true);
+
+  const top3 = players.slice(0,3);
+  const rest = players.slice(3,10);
+  app.innerHTML = `
+    <h3 style="margin-top:0; text-align:center;">🏆 Resultados finales</h3>
+    <div class="podium">
+      ${top3[1]?`<div class="col p2"><div class="bar">2</div><div class="name">${escapeHtml(top3[1].name)}</div><div class="score">${top3[1].score} pts</div></div>`:""}
+      ${top3[0]?`<div class="col p1"><div class="bar">1</div><div class="name">${escapeHtml(top3[0].name)}</div><div class="score">${top3[0].score} pts</div></div>`:""}
+      ${top3[2]?`<div class="col p3"><div class="bar">3</div><div class="name">${escapeHtml(top3[2].name)}</div><div class="score">${top3[2].score} pts</div></div>`:""}
+    </div>
+    ${rest.length ? `<div style="margin-top:10px;">${rest.map((p,i)=>`
+      <div class="lb-row">
+        <div class="lb-rank">${i+4}</div>
+        <div class="lb-name">${escapeHtml(p.name)}</div>
+        <div class="lb-score">${p.score||0}</div>
+      </div>`).join("")}</div>` : ""}
+    <div class="footer-row">
+      <div class="small-note">Sala ${gameId} · Quiz finalizado</div>
+      <button class="btn ghost" id="restartBtn">Nueva sesión</button>
+    </div>
+  `;
+  document.getElementById("restartBtn").onclick = () => { role=null; renderRoleSelect(); };
+}
+
+// ============================================================
+// JUGADOR
+// ============================================================
+function renderPlayerScreen(){
+  pollTimer = setInterval(pollPlayer, 1200);
+  pollPlayer();
+}
+
+async function pollPlayer(){
+  const metaRaw = await sGet(gKey(gameId,"meta"), true);
+  if(!metaRaw) return;
+  let meta; try{ meta = JSON.parse(metaRaw); }catch(e){ return; }
+
+  if(meta.status === "lobby"){
+    app.innerHTML = `
+      <div class="waiting">
+        <div class="pulse"></div>
+        <h3>¡Estás dentro, ${escapeHtml(playerName)}!</h3>
+        <div class="small-note">Esperando a que el anfitrión inicie el quiz…</div>
+      </div>`;
+    footNote.textContent = "Jugador · sala " + gameId;
+    return;
+  }
+
+  if(meta.status === "question"){
+    localAnswered = false;
+    renderPlayerQuestion(meta);
+    return;
+  }
+
+  if(meta.status === "reveal" || meta.status === "leaderboard"){
+    if(!app.dataset.revealShown || app.dataset.revealShown !== String(meta.currentQuestion)+meta.status){
+      app.dataset.revealShown = String(meta.currentQuestion)+meta.status;
+      renderPlayerFeedback(meta);
+    }
+    return;
+  }
+
+  if(meta.status === "ended"){
+    stopPolling();
+    renderPlayerFinal();
+    return;
+  }
+}
+
+function renderPlayerQuestion(meta){
+  const idx = meta.currentQuestion;
+  const key = "q"+idx;
+  if(app.dataset.qShown === key) { updatePlayerTimer(meta); return; }
+  app.dataset.qShown = key;
+  app.dataset.revealShown = "";
+  const item = QUESTIONS[idx];
+  app.innerHTML = `
+    <div class="q-meta">
+      <div class="q-count">Pregunta ${idx+1} / ${QUESTIONS.length}</div>
+      <div class="timer" id="pTimer">--</div>
+    </div>
+    <div class="q-topic">${item.tema}</div>
+    <div class="q-text">${item.q}</div>
+    <div class="opts" id="pOpts">
+      ${item.opts.map((o,i)=>`<button class="opt ${OPT_CLASS[i]}" data-i="${i}"><span class="shape">${OPT_SHAPE[i]}</span>${o}</button>`).join("")}
+    </div>
+  `;
+  document.querySelectorAll("#pOpts .opt").forEach(btn=>{
+    btn.onclick = () => submitAnswer(idx, parseInt(btn.dataset.i,10));
+  });
+  footNote.textContent = "Jugador · sala " + gameId;
+  updatePlayerTimer(meta);
+}
+
+function updatePlayerTimer(meta){
+  const timerEl = document.getElementById("pTimer");
+  if(!timerEl || !meta.questionStartTime) return;
+  const remaining = Math.max(0, Math.ceil((meta.questionStartTime + TIME_LIMIT*1000 - Date.now())/1000));
+  timerEl.textContent = remaining;
+  timerEl.classList.toggle("low", remaining<=5);
+}
+
+async function submitAnswer(idx, optionIndex){
+  if(localAnswered) return;
+  localAnswered = true;
+  document.querySelectorAll("#pOpts .opt").forEach(b=>{ b.disabled=true; if(parseInt(b.dataset.i,10)!==optionIndex) b.classList.add("dim"); });
+  await sSet(gKey(gameId,"answer:"+idx+":"+playerId), JSON.stringify({playerId, optionIndex, answeredAt: Date.now()}), true);
+  const item = QUESTIONS[idx];
+  app.innerHTML = `
+    <div class="waiting">
+      <div class="pulse"></div>
+      <h3>Respuesta enviada</h3>
+      <div class="small-note">Esperando a que termine el tiempo o respondan los demás…</div>
+    </div>`;
+}
+
+async function renderPlayerFeedback(meta){
+  const idx = meta.currentQuestion;
+  const item = QUESTIONS[idx];
+  const raw = await sGet(gKey(gameId,"answer:"+idx+":"+playerId), true);
+  let mine = null; if(raw){ try{ mine = JSON.parse(raw); }catch(e){} }
+  const plRaw = await sGet(gKey(gameId,"player:"+playerId), true);
+  let me = null; if(plRaw){ try{ me = JSON.parse(plRaw); }catch(e){} }
+
+  const correct = mine && mine.optionIndex === item.correct;
+  app.innerHTML = `
+    <div class="feedback-big">
+      <div class="icon">${mine ? (correct ? "✅" : "❌") : "⏱️"}</div>
+      <h3 style="margin:0;">${mine ? (correct ? "¡Correcto!" : "Incorrecto") : "No respondiste a tiempo"}</h3>
+      <div class="small-note">Respuesta correcta: ${item.opts[item.correct]}</div>
+      <div class="pts">${me ? "Puntaje total: " + (me.score||0) + " pts" : ""}</div>
+    </div>
+  `;
+  footNote.textContent = "Jugador · sala " + gameId;
+}
+
+async function renderPlayerFinal(){
+  const plRaw = await sGet(gKey(gameId,"player:"+playerId), true);
+  let me = null; if(plRaw){ try{ me = JSON.parse(plRaw); }catch(e){} }
+  const plKeys = await sList(gKey(gameId,"player:"), true);
+  const players = [];
+  for(const k of plKeys){
+    const raw = await sGet(k, true);
+    if(raw){ try{ players.push(JSON.parse(raw)); }catch(e){} }
+  }
+  players.sort((a,b)=>(b.score||0)-(a.score||0));
+  const myRank = players.findIndex(p => me && p.name===me.name && p.score===me.score) + 1;
+
+  app.innerHTML = `
+    <div class="feedback-big">
+      <div class="icon">🏁</div>
+      <h3>¡Quiz terminado!</h3>
+      <div class="small-note">Tu puesto: ${myRank || "-"} de ${players.length} · Puntaje: ${me?me.score:0} pts</div>
+    </div>
+  `;
+  footNote.textContent = "Jugador · sala " + gameId + " · finalizado";
+}
+
+// ============================================================
+// UTIL
+// ============================================================
+function stopPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
+
+// ============================================================
+// INICIO
+// ============================================================
+renderRoleSelect();
+})();
+</script>
+</body>
+</html>
