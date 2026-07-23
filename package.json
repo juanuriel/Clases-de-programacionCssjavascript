@@ -1,0 +1,16 @@
+{
+  "name": "voip-quiz-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor del Quiz VoIP en vivo (backend de sincronización para el anfitrión y los jugadores).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
