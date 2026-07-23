@@ -238,16 +238,30 @@ const GAME_KEY = "vquiz:currentGame";
 function gKey(id, suffix){ return "vquiz:g:" + id + ":" + suffix; }
 
 async function sGet(key, shared){
-  try{ const r = await window.storage.get(key, !!shared); return r ? r.value : null; }
-  catch(e){ return null; }
+  try{
+    const r = await fetch("/api/kv/" + encodeURIComponent(key));
+    if(!r.ok) return null;
+    const data = await r.json();
+    return data.value;
+  }catch(e){ return null; }
 }
 async function sSet(key, value, shared){
-  try{ await window.storage.set(key, value, !!shared); return true; }
-  catch(e){ return false; }
+  try{
+    await fetch("/api/kv/" + encodeURIComponent(key), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value }),
+    });
+    return true;
+  }catch(e){ return false; }
 }
 async function sList(prefix, shared){
-  try{ const r = await window.storage.list(prefix, !!shared); return r ? r.keys : []; }
-  catch(e){ return []; }
+  try{
+    const r = await fetch("/api/kv-list?prefix=" + encodeURIComponent(prefix));
+    if(!r.ok) return [];
+    const data = await r.json();
+    return data.keys || [];
+  }catch(e){ return []; }
 }
 
 function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
