@@ -1,7 +1,0 @@
-# Dentro de tu repositorio ya clonado
-mkdir img
-touch img/.gitkeep    # o mete ahí un archivo real
-
-git add img
-git commit -m "Crear carpeta nombre-carpeta"
-git push
