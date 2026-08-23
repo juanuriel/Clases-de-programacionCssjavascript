@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataViz Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Cabinet+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0e10;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(255,255,255,0.15);
+    --accent: #c8f04a;
+    --accent2: #4af0c8;
+    --accent3: #f04a8a;
+    --text: #f0f0f0;
+    --text-muted: #888;
+    --text-dim: #444;
+    --radius: 12px;
+    --font-head: 'Cabinet Grotesk', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-head);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(200,240,74,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,240,74,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 1300px; margin: 0 auto; padding: 0 24px 80px; }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 28px 0 36px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-mark svg { width: 20px; height: 20px; }
+  .logo-text { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-text span { color: var(--accent); }
+  .header-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    padding: 4px 12px;
+    border-radius: 20px;
+  }
+
+  /* Upload zone */
+  .upload-section { margin-bottom: 40px; }
+  .upload-zone {
+    border: 1.5px dashed var(--border-hover);
+    border-radius: var(--radius);
+    padding: 52px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(200,240,74,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: #1a1e12;
+  }
+  .upload-zone.drag-over { transform: scale(1.005); }
+  .upload-icon {
+    width: 52px; height: 52px;
+    background: rgba(200,240,74,0.1);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+  }
+  .upload-icon svg { width: 26px; height: 26px; stroke: var(--accent); }
+  .upload-title {
+    font-size: 20px; font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .upload-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+  .upload-sub strong { color: var(--accent); }
+  #fileInput { display: none; }
+  .upload-btn {
+    display: inline-block;
+    margin-top: 18px;
+    padding: 9px 22px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    color: var(--accent);
+    font-family: var(--font-head);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+  }
+  .upload-btn:hover { background: var(--accent); color: #0e0e10; }
+
+  /* File info bar */
+  .file-bar {
+    display: none;
+    align-items: center;
+    gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    margin-top: 14px;
+  }
+  .file-bar.visible { display: flex; }
+  .file-icon-sm {
+    width: 32px; height: 32px;
+    background: rgba(200,240,74,0.12);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .file-icon-sm svg { width: 16px; height: 16px; stroke: var(--accent); }
+  .file-name { font-size: 14px; font-weight: 600; }
+  .file-meta { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+  .file-clear {
+    margin-left: auto;
+    background: none; border: none;
+    color: var(--text-muted);
+    cursor: pointer; font-size: 18px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .file-clear:hover { color: var(--accent3); }
+
+  /* Sheet selector */
+  .sheet-row {
+    display: none;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .sheet-row.visible { display: flex; }
+  .sheet-pill {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    background: var(--surface);
+    color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .sheet-pill:hover { border-color: var(--border-hover); color: var(--text); }
+  .sheet-pill.active { background: var(--accent); color: #0e0e10; border-color: var(--accent); font-weight: 500; }
+
+  /* Stats bar */
+  .stats-bar {
+    display: none;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .stats-bar.visible { display: grid; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s ease;
+  }
+  .stat-card.loaded::after { transform: scaleX(1); }
+  .stat-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+  .stat-value { font-size: 26px; font-weight: 800; line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; font-family: var(--font-mono); }
+
+  /* Controls */
+  .controls-row {
+    display: none;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .controls-row.visible { display: flex; }
+  .control-group { display: flex; flex-direction: column; gap: 6px; min-width: 160px; flex: 1; }
+  .control-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--font-head);
+    font-size: 13px;
+    padding: 9px 12px;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 30px;
+    transition: border-color 0.15s;
+  }
+  select:hover, select:focus { border-color: var(--border-hover); }
+
+  .chart-type-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .chart-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-family: var(--font-head);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chart-btn svg { width: 14px; height: 14px; }
+  .chart-btn:hover { border-color: var(--border-hover); color: var(--text); }
+  .chart-btn.active { background: var(--accent); color: #0e0e10; border-color: var(--accent); }
+  .chart-btn.active svg { stroke: #0e0e10; }
+
+  /* Chart area */
+  .chart-grid {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .chart-grid.visible { display: grid; }
+  .chart-grid.single { grid-template-columns: 1fr; }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    position: relative;
+  }
+  .chart-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .chart-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+  }
+  .chart-card-sub {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .chart-canvas-wrap {
+    position: relative;
+    width: 100%;
+  }
+
+  /* Table preview */
+  .table-section {
+    display: none;
+    margin-top: 24px;
+  }
+  .table-section.visible { display: block; }
+  .table-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .table-title { font-size: 14px; font-weight: 700; }
+  .table-count { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+  .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  thead { background: var(--surface2); }
+  th {
+    padding: 10px 14px;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); color: var(--text); }
+
+  /* Empty state */
+  .empty-charts {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 60px 24px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+  .empty-charts p { font-size: 14px; }
+
+  /* Download btn */
+  .dl-btn {
+    padding: 9px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-family: var(--font-head);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dl-btn svg { width: 13px; height: 13px; }
+  .dl-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* Toasts */
+  .toast-area { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-size: 13px;
+    animation: slideIn 0.25s ease;
+    max-width: 280px;
+  }
+  .toast.success { border-color: rgba(200,240,74,0.4); color: var(--accent); }
+  .toast.error { border-color: rgba(240,74,138,0.4); color: var(--accent3); }
+  @keyframes slideIn { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform: translateY(0); } }
+
+  @media (max-width: 768px) {
+    .chart-grid { grid-template-columns: 1fr !important; }
+    .controls-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0e0e10" stroke-width="2.5">
+          <path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-6"/>
+        </svg>
+      </div>
+      <div class="logo-text">Data<span>Viz</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <a href="index.html" style="display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--border);border-radius:20px;color:var(--text);font-family:var(--font-mono);font-size:11px;text-decoration:none;background:var(--surface)">← Dashboard Ginebra</a>
+      <div class="header-tag">Excel → Gráficos</div>
+    </div>
+  </header>
+
+  <!-- Upload -->
+  <div class="upload-section">
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <div class="upload-title">Sube tu archivo Excel</div>
+      <div class="upload-sub">Arrastra aquí o haz clic · <strong>.xlsx</strong> · <strong>.xls</strong> · <strong>.csv</strong></div>
+      <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Seleccionar archivo</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    </div>
+    <div class="file-bar" id="fileBar">
+      <div class="file-icon-sm">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+      </div>
+      <div>
+        <div class="file-name" id="fileName">—</div>
+        <div class="file-meta" id="fileMeta">—</div>
+      </div>
+      <button class="file-clear" id="clearBtn" title="Quitar archivo">×</button>
+    </div>
+  </div>
+
+  <!-- Sheets -->
+  <div class="sheet-row" id="sheetRow"></div>
+
+  <!-- Stats -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card" id="sc1"><div class="stat-label">Filas</div><div class="stat-value" id="sv1">—</div></div>
+    <div class="stat-card" id="sc2"><div class="stat-label">Columnas</div><div class="stat-value" id="sv2">—</div></div>
+    <div class="stat-card" id="sc3"><div class="stat-label">Numéricas</div><div class="stat-value" id="sv3">—</div></div>
+    <div class="stat-card" id="sc4"><div class="stat-label">Categóricas</div><div class="stat-value" id="sv4">—</div></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls-row" id="controlsRow">
+    <div class="control-group">
+      <div class="control-label">Eje X / Categoría</div>
+      <select id="colX"></select>
+    </div>
+    <div class="control-group">
+      <div class="control-label">Eje Y / Valor</div>
+      <select id="colY"></select>
+    </div>
+    <div class="control-group">
+      <div class="control-label">Tipo de gráfico</div>
+      <div class="chart-type-row">
+        <button class="chart-btn active" data-type="bar" onclick="setChart('bar',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="10" width="4" height="11"/><rect x="10" y="6" width="4" height="15"/><rect x="17" y="3" width="4" height="18"/></svg>Barras
+        </button>
+        <button class="chart-btn" data-type="line" onclick="setChart('line',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 17 8 11 13 15 18 7 22 10"/></svg>Línea
+        </button>
+        <button class="chart-btn" data-type="doughnut" onclick="setChart('doughnut',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>Dona
+        </button>
+        <button class="chart-btn" data-type="scatter" onclick="setChart('scatter',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="5" cy="8" r="2"/><circle cx="19" cy="16" r="2"/></svg>Dispersión
+        </button>
+        <button class="chart-btn" data-type="radar" onclick="setChart('radar',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 19 8.5 17 18 7 18 5 8.5"/><line x1="12" y1="2" x2="12" y2="18"/><line x1="5" y1="8.5" x2="19" y2="8.5"/></svg>Radar
+        </button>
+      </div>
+    </div>
+    <button class="dl-btn" onclick="downloadChart()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Exportar PNG
+    </button>
+  </div>
+
+  <!-- Charts -->
+  <div class="chart-grid single" id="chartGrid">
+    <div class="empty-charts" id="emptyState">
+      <p>Sube un archivo Excel o CSV para comenzar a visualizar tus datos</p>
+    </div>
+    <div class="chart-card" id="mainChartCard" style="display:none;">
+      <div class="chart-card-header">
+        <div>
+          <div class="chart-card-title" id="chartTitle">Gráfico principal</div>
+          <div class="chart-card-sub" id="chartSub">—</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:360px;">
+        <canvas id="mainChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card" id="distChartCard" style="display:none;">
+      <div class="chart-card-header">
+        <div>
+          <div class="chart-card-title">Distribución de valores</div>
+          <div class="chart-card-sub" id="distSub">—</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:360px;">
+        <canvas id="distChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-section" id="tableSection">
+    <div class="table-header">
+      <div class="table-title">Vista previa de datos</div>
+      <div class="table-count" id="tableCount">—</div>
+    </div>
+    <div class="table-wrap">
+      <table id="dataTable">
+        <thead id="tableHead"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast-area" id="toastArea"></div>
+
+<script>
+let workbook = null;
+let currentSheet = null;
+let df = [];
+let columns = [];
+let chartType = 'bar';
+let mainChartInst = null;
+let distChartInst = null;
+
+const PALETTE = ['#c8f04a','#4af0c8','#f04a8a','#4a8af0','#f0a84a','#a84af0','#4af05c','#f04a4a','#4ae8f0','#f0e84a'];
+
+// Upload zone
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+zone.addEventListener('click', e => { if(e.target === zone || e.target.closest('.upload-zone') === zone) document.getElementById('fileInput').click(); });
+document.getElementById('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
+document.getElementById('clearBtn').addEventListener('click', clearAll);
+
+document.getElementById('colX').addEventListener('change', renderCharts);
+document.getElementById('colY').addEventListener('change', renderCharts);
+
+function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['xlsx','xls','csv'].includes(ext)) { toast('Formato no soportado. Usa .xlsx, .xls o .csv', 'error'); return; }
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      workbook = XLSX.read(data, { type: 'array' });
+      showFile(file);
+      buildSheetPills();
+      loadSheet(workbook.SheetNames[0]);
+      toast(`✓ ${file.name} cargado`, 'success');
+    } catch(err) {
+      toast('Error al leer el archivo', 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showFile(file) {
+  document.getElementById('fileBar').classList.add('visible');
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileMeta').textContent = `${(file.size/1024).toFixed(1)} KB`;
+}
+
+function buildSheetPills() {
+  const row = document.getElementById('sheetRow');
+  row.innerHTML = '';
+  workbook.SheetNames.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'sheet-pill' + (i===0?' active':'');
+    btn.textContent = name;
+    btn.onclick = () => {
+      document.querySelectorAll('.sheet-pill').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      loadSheet(name);
+    };
+    row.appendChild(btn);
+  });
+  row.classList.add('visible');
+}
+
+function loadSheet(name) {
+  currentSheet = name;
+  const ws = workbook.Sheets[name];
+  const raw = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  if (!raw.length) { toast('Hoja vacía', 'error'); return; }
+  df = raw;
+  columns = Object.keys(raw[0]);
+  buildStats();
+  buildSelects();
+  buildTable();
+  renderCharts();
+}
+
+function buildStats() {
+  const numCols = columns.filter(c => df.some(r => typeof r[c] === 'number'));
+  const catCols = columns.filter(c => !numCols.includes(c));
+  const vals = [df.length, columns.length, numCols.length, catCols.length];
+  vals.forEach((v,i) => {
+    document.getElementById(`sv${i+1}`).textContent = v.toLocaleString();
+    const card = document.getElementById(`sc${i+1}`);
+    card.classList.remove('loaded');
+    setTimeout(() => card.classList.add('loaded'), 100 + i*80);
+  });
+  document.getElementById('statsBar').classList.add('visible');
+}
+
+function buildSelects() {
+  const xSel = document.getElementById('colX');
+  const ySel = document.getElementById('colY');
+  xSel.innerHTML = '';
+  ySel.innerHTML = '';
+  columns.forEach(c => {
+    xSel.innerHTML += `<option value="${c}">${c}</option>`;
+    ySel.innerHTML += `<option value="${c}">${c}</option>`;
+  });
+  // Auto-select: first col for X, first numeric for Y
+  const numCols = columns.filter(c => df.some(r => typeof r[c] === 'number'));
+  if (numCols.length > 0) {
+    ySel.value = numCols[0];
+    xSel.value = columns.find(c => c !== numCols[0]) || columns[0];
+    if (numCols.length > 1) ySel.value = numCols[1];
+  }
+  document.getElementById('controlsRow').classList.add('visible');
+}
+
+function buildTable() {
+  const head = document.getElementById('tableHead');
+  const body = document.getElementById('tableBody');
+  const preview = df.slice(0, 8);
+  head.innerHTML = `<tr>${columns.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+  body.innerHTML = preview.map(row =>
+    `<tr>${columns.map(c=>`<td>${row[c]}</td>`).join('')}</tr>`
+  ).join('');
+  document.getElementById('tableCount').textContent = `${df.length.toLocaleString()} filas · mostrando 8`;
+  document.getElementById('tableSection').classList.add('visible');
+}
+
+function setChart(type, btn) {
+  chartType = type;
+  document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCharts();
+}
+
+function renderCharts() {
+  const xCol = document.getElementById('colX').value;
+  const yCol = document.getElementById('colY').value;
+  if (!xCol || !yCol || !df.length) return;
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('mainChartCard').style.display = '';
+  document.getElementById('chartGrid').classList.add('visible');
+
+  const labels = df.slice(0,50).map(r => String(r[xCol]).substring(0,20));
+  const values = df.slice(0,50).map(r => parseFloat(r[yCol]) || 0);
+
+  document.getElementById('chartTitle').textContent = `${yCol} por ${xCol}`;
+  document.getElementById('chartSub').textContent = `${Math.min(df.length,50)} registros · tipo: ${chartType}`;
+
+  if (mainChartInst) mainChartInst.destroy();
+
+  const ctx = document.getElementById('mainChart');
+  const isDoughnut = chartType === 'doughnut';
+  const isScatter = chartType === 'scatter';
+  const isRadar = chartType === 'radar';
+
+  let dataset;
+  if (isScatter) {
+    const xVals = df.slice(0,200).map(r => parseFloat(r[xCol]) || 0);
+    const yVals = df.slice(0,200).map(r => parseFloat(r[yCol]) || 0);
+    dataset = { label: `${xCol} vs ${yCol}`,
+      data: xVals.map((x,i) => ({x, y: yVals[i]})),
+      backgroundColor: 'rgba(200,240,74,0.5)',
+      borderColor: '#c8f04a', pointRadius: 4 };
+  } else if (isDoughnut) {
+    dataset = { data: values, backgroundColor: PALETTE.slice(0, values.length),
+      borderColor: '#16161a', borderWidth: 2 };
+  } else if (isRadar) {
+    const topLabels = labels.slice(0,8);
+    const topVals = values.slice(0,8);
+    dataset = { label: yCol, data: topVals,
+      backgroundColor: 'rgba(200,240,74,0.15)',
+      borderColor: '#c8f04a', borderWidth: 2,
+      pointBackgroundColor: '#c8f04a' };
+    mainChartInst = new Chart(ctx, {
+      type: 'radar',
+      data: { labels: topLabels, datasets: [dataset] },
+      options: { responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{ r:{ ticks:{color:'#888',font:{size:10}}, grid:{color:'rgba(255,255,255,0.07)'}, pointLabels:{color:'#ccc',font:{size:11}} } } }
+    });
+    showDistChart(yCol, values);
+    return;
+  } else {
+    dataset = { label: yCol, data: values,
+      backgroundColor: chartType==='line' ? 'rgba(200,240,74,0.1)' : PALETTE.slice(0, values.length),
+      borderColor: '#c8f04a', borderWidth: chartType==='line'?2:0,
+      fill: chartType==='line', tension: 0.4,
+      borderRadius: chartType==='bar'?4:0 };
+  }
+
+  mainChartInst = new Chart(ctx, {
+    type: chartType,
+    data: { labels: isScatter ? undefined : labels, datasets: [dataset] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: isDoughnut, labels:{ color:'#aaa', font:{size:11}, boxWidth:12 } } },
+      scales: isDoughnut || isScatter ? (isScatter ? {
+        x:{ ticks:{color:'#888'}, grid:{color:'rgba(255,255,255,0.05)'} },
+        y:{ ticks:{color:'#888'}, grid:{color:'rgba(255,255,255,0.05)'} }
+      } : {}) : {
+        x: { ticks:{ color:'#888', font:{size:11}, maxRotation:40 }, grid:{display:false} },
+        y: { ticks:{ color:'#888', font:{size:11} }, grid:{color:'rgba(255,255,255,0.05)'} }
+      }
+    }
+  });
+
+  showDistChart(yCol, values);
+}
+
+function showDistChart(col, values) {
+  document.getElementById('distChartCard').style.display = '';
+  document.getElementById('chartGrid').classList.remove('single');
+  document.getElementById('distSub').textContent = `${col} · distribución de frecuencias`;
+
+  const min = Math.min(...values), max = Math.max(...values);
+  const bins = 12;
+  const step = (max - min) / bins || 1;
+  const buckets = Array.from({length: bins}, (_,i) => ({ label: `${(min+i*step).toFixed(1)}`, count: 0 }));
+  values.forEach(v => {
+    const idx = Math.min(Math.floor((v - min) / step), bins - 1);
+    buckets[idx].count++;
+  });
+
+  if (distChartInst) distChartInst.destroy();
+  const ctx2 = document.getElementById('distChart');
+  distChartInst = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: buckets.map(b => b.label),
+      datasets: [{ label: 'Frecuencia', data: buckets.map(b => b.count),
+        backgroundColor: 'rgba(74,240,200,0.6)', borderColor: '#4af0c8',
+        borderWidth: 1, borderRadius: 3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks:{ color:'#888', font:{size:10}, maxRotation:45 }, grid:{display:false} },
+        y: { ticks:{ color:'#888', font:{size:11} }, grid:{color:'rgba(255,255,255,0.05)'} }
+      }
+    }
+  });
+}
+
+function downloadChart() {
+  const canvas = document.getElementById('mainChart');
+  const link = document.createElement('a');
+  link.download = 'grafico_dataviz.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  toast('Gráfico exportado ✓', 'success');
+}
+
+function clearAll() {
+  workbook = null; df = []; columns = [];
+  if (mainChartInst) { mainChartInst.destroy(); mainChartInst = null; }
+  if (distChartInst) { distChartInst.destroy(); distChartInst = null; }
+  document.getElementById('fileBar').classList.remove('visible');
+  document.getElementById('sheetRow').classList.remove('visible');
+  document.getElementById('statsBar').classList.remove('visible');
+  document.getElementById('controlsRow').classList.remove('visible');
+  document.getElementById('tableSection').classList.remove('visible');
+  document.getElementById('chartGrid').classList.remove('visible');
+  document.getElementById('emptyState').style.display = '';
+  document.getElementById('mainChartCard').style.display = 'none';
+  document.getElementById('distChartCard').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('sheetRow').innerHTML = '';
+}
+
+function toast(msg, type='success') {
+  const area = document.getElementById('toastArea');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  area.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+</script>
+</body>
+</html>
